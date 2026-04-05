@@ -59,6 +59,14 @@ CCMeter reads your local Claude Code session data and renders an interactive TUI
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/hmenzagh/CCMeter/releases/latest/download/ccmeter-installer.sh | sh
 ```
 
+### Homebrew
+
+Install prebuilt binaries via Homebrew:
+
+```bash
+brew install hmenzagh/tap/ccmeter
+```
+
 ### From source
 
 ```bash
