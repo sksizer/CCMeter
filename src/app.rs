@@ -134,7 +134,7 @@ impl App {
         let (source_names, source_roots) = build_source_list(&root_cwd_map);
         let source_index: usize = 0;
         let project_index: Option<usize> = None;
-        let time_filter = TimeFilter::All;
+        let time_filter = TimeFilter::from_index(overrides.display.time_filter_index);
 
         let cwds_filter = project_cwds_static(&groups, project_index);
 
@@ -278,6 +278,9 @@ impl App {
             match key.code {
                 KeyCode::Tab => {
                     self.time_filter = self.time_filter.next();
+                    self.config.overrides.display.time_filter_index =
+                        self.time_filter.index();
+                    self.config.overrides.save();
                     self.card_scroll = 0;
                     self.render_dirty = true;
                     return true;

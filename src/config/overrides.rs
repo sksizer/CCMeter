@@ -10,6 +10,9 @@ pub struct DisplaySettings {
     /// When true, heatmap cells scale to fill the panel width.
     #[serde(default)]
     pub expanded_heatmap: bool,
+    /// Persisted time-filter index (0 = All … 5 = 1h).
+    #[serde(default)]
+    pub time_filter_index: usize,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

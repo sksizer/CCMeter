@@ -37,6 +37,17 @@ impl TimeFilter {
         }
     }
 
+    pub(crate) fn from_index(i: usize) -> TimeFilter {
+        match i {
+            1 => TimeFilter::LastMonth,
+            2 => TimeFilter::LastWeek,
+            3 => TimeFilter::Today,
+            4 => TimeFilter::Hour12,
+            5 => TimeFilter::Hour1,
+            _ => TimeFilter::All,
+        }
+    }
+
     pub(crate) fn next(&self) -> TimeFilter {
         match self {
             TimeFilter::All => TimeFilter::LastMonth,
