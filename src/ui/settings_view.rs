@@ -6,9 +6,36 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
 };
 
+use super::heatmap::fill_cell;
 use super::theme::theme;
 use crate::config::discovery::{self, OverrideInfo, ProjectGroup};
 use crate::config::overrides::Overrides;
+use crate::config::settings::Settings;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+/// Settings view is split into tabs, cycled with the Tab key.
+pub enum SettingsTab {
+    Projects,
+    Display,
+}
+
+impl SettingsTab {
+    const ALL: &'static [SettingsTab] = &[SettingsTab::Projects, SettingsTab::Display];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Projects => "Projects",
+            Self::Display => "Display",
+        }
+    }
+
+    fn next(self) -> Self {
+        match self {
+            Self::Projects => Self::Display,
+            Self::Display => Self::Projects,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum RowKind {
@@ -93,6 +120,7 @@ struct SearchState {
 }
 
 pub struct SettingsState {
+    tab: SettingsTab,
     rows: Vec<RowKind>,
     pub selected: usize,
     expanded: HashSet<usize>,
@@ -106,6 +134,7 @@ pub struct SettingsState {
 impl SettingsState {
     pub fn new(groups: &[ProjectGroup]) -> Self {
         let mut s = Self {
+            tab: SettingsTab::Projects,
             rows: Vec::new(),
             selected: 0,
             expanded: HashSet::new(),
@@ -119,10 +148,21 @@ impl SettingsState {
         s
     }
 
-    pub fn with_selected(groups: &[ProjectGroup], selected: usize) -> Self {
+    pub fn with_selected(
+        groups: &[ProjectGroup],
+        selected: usize,
+        tab: Option<SettingsTab>,
+    ) -> Self {
         let mut s = Self::new(groups);
         s.selected = selected.min(s.rows.len().saturating_sub(1));
+        if let Some(t) = tab {
+            s.tab = t;
+        }
         s
+    }
+
+    pub fn active_tab(&self) -> SettingsTab {
+        self.tab
     }
 
     fn rebuild_rows(&mut self, groups: &[ProjectGroup]) {
@@ -153,6 +193,7 @@ impl SettingsState {
         key: KeyEvent,
         groups: &[ProjectGroup],
         overrides: &mut Overrides,
+        settings: &mut Settings,
     ) -> KeyResult {
         if key.kind != KeyEventKind::Press {
             return KeyResult::Continue;
@@ -238,6 +279,24 @@ impl SettingsState {
             return KeyResult::Continue;
         }
 
+        // Tab switching (available on all tabs)
+        if key.code == KeyCode::Tab {
+            self.tab = self.tab.next();
+            return KeyResult::Continue;
+        }
+
+        match self.tab {
+            SettingsTab::Projects => self.handle_projects_key(key, groups, overrides),
+            SettingsTab::Display => self.handle_display_key(key, settings),
+        }
+    }
+
+    fn handle_projects_key(
+        &mut self,
+        key: KeyEvent,
+        groups: &[ProjectGroup],
+        overrides: &mut Overrides,
+    ) -> KeyResult {
         match key.code {
             KeyCode::Esc | KeyCode::Char('.') => {
                 if self.merge_first.is_some() {
@@ -364,24 +423,51 @@ impl SettingsState {
         KeyResult::Continue
     }
 
+    fn handle_display_key(&mut self, key: KeyEvent, settings: &mut Settings) -> KeyResult {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('.') => return KeyResult::Close,
+            KeyCode::Left | KeyCode::Right => {
+                settings.expanded_heatmap = !settings.expanded_heatmap;
+                settings.save();
+                return KeyResult::Rebuild;
+            }
+            _ => {}
+        }
+        KeyResult::Continue
+    }
+
     pub fn render(
         &self,
         frame: &mut Frame,
         area: Rect,
         groups: &[ProjectGroup],
         overrides: &Overrides,
+        settings: &Settings,
     ) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(2)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(2),
+            ])
             .split(area);
 
-        self.render_list(frame, chunks[0], groups, overrides);
+        self.render_tab_bar(frame, chunks[0]);
 
-        if self.search.is_some() {
-            self.render_search_bar(frame, chunks[1]);
-        } else {
-            self.render_status_bar(frame, chunks[1], groups, overrides);
+        match self.tab {
+            SettingsTab::Projects => {
+                self.render_list(frame, chunks[1], groups, overrides);
+                if self.search.is_some() {
+                    self.render_search_bar(frame, chunks[2]);
+                } else {
+                    self.render_status_bar(frame, chunks[2], groups, overrides);
+                }
+            }
+            SettingsTab::Display => {
+                self.render_display_tab(frame, chunks[1], settings);
+                self.render_display_status_bar(frame, chunks[2]);
+            }
         }
 
         if let Some(modal) = &self.rename_modal {
@@ -391,6 +477,27 @@ impl SettingsState {
         if self.confirm_reset {
             self.render_confirm_reset(frame, area);
         }
+    }
+
+    fn render_tab_bar(&self, frame: &mut Frame, area: Rect) {
+        let t = theme();
+        let mut spans = Vec::new();
+        for (i, tab) in SettingsTab::ALL.iter().enumerate() {
+            if i > 0 {
+                spans.push(Span::styled(" │ ", Style::default().fg(t.divider)));
+            }
+            if *tab == self.tab {
+                spans.push(Span::styled(
+                    tab.label(),
+                    Style::default()
+                        .fg(t.heatmap_title)
+                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                ));
+            } else {
+                spans.push(Span::styled(tab.label(), Style::default().fg(t.text_dim)));
+            }
+        }
+        frame.render_widget(Paragraph::new(Line::from(spans)), area);
     }
 
     fn render_search_bar(&self, frame: &mut Frame, area: Rect) {
@@ -588,10 +695,11 @@ impl SettingsState {
                 Block::default()
                     .title(title)
                     .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded)
                     .border_style(if self.merge_first.is_some() {
                         Style::default().fg(t.warning)
                     } else {
-                        Style::default()
+                        Style::default().fg(t.border)
                     }),
             )
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
@@ -735,6 +843,138 @@ impl SettingsState {
         ListItem::new(line)
     }
 
+    fn render_display_tab(&self, frame: &mut Frame, area: Rect, settings: &Settings) {
+        let t = theme();
+        let is_expanded = settings.expanded_heatmap;
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(2),
+                Constraint::Length(6),
+                Constraint::Min(0),
+            ])
+            .split(area);
+
+        // --- Heatmap mode selector (←→ to switch) ---
+        let label = Line::from(vec![
+            Span::styled("  Heatmap mode: ", Style::default().fg(t.text_dim)),
+            Span::styled(
+                if is_expanded { "Expanded" } else { "Compact" },
+                Style::default()
+                    .fg(t.heatmap_title)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]);
+        let setting_block = Paragraph::new(vec![Line::raw(""), label]);
+        frame.render_widget(setting_block, chunks[0]);
+
+        // --- Inline preview ---
+        if chunks[1].width >= 30 {
+            let cols_area = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(chunks[1]);
+
+            self.render_mini_heatmap(frame, cols_area[0], !is_expanded, false);
+            self.render_mini_heatmap(frame, cols_area[1], is_expanded, true);
+        }
+    }
+
+    fn render_mini_heatmap(&self, frame: &mut Frame, area: Rect, is_active: bool, expanded: bool) {
+        let t = theme();
+
+        let label = if expanded { "Expanded" } else { "Compact" };
+        let (border_color, title_style) = if is_active {
+            (
+                t.heatmap_title,
+                Style::default()
+                    .fg(t.heatmap_title)
+                    .add_modifier(Modifier::BOLD),
+            )
+        } else {
+            (t.border, Style::default().fg(t.text_dim))
+        };
+
+        let mut title_spans = vec![Span::styled(format!(" {} ", label), title_style)];
+        if is_active {
+            title_spans.push(Span::styled(
+                " \u{25c0} active ",
+                Style::default()
+                    .fg(t.heatmap_title)
+                    .add_modifier(Modifier::DIM),
+            ));
+        }
+
+        let block = Block::default()
+            .title(Line::from(title_spans))
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(border_color));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        if inner.width < 4 || inner.height < 2 {
+            return;
+        }
+
+        let sample_cols: u16 = 7;
+        let sample_rows: u16 = inner.height.min(4);
+        let cell_w: u16 = if expanded {
+            (inner.width / sample_cols).max(2)
+        } else {
+            2
+        };
+        let fill_w: u16 = if expanded { cell_w } else { 1 };
+        let grid_w = sample_cols * cell_w;
+        let left_pad = if expanded {
+            (inner.width.saturating_sub(grid_w)) / 2
+        } else {
+            1
+        };
+
+        let pattern: &[&[u8]] = &[
+            &[0, 1, 2, 3, 2, 1, 0],
+            &[1, 2, 3, 4, 3, 2, 1],
+            &[0, 1, 3, 4, 4, 2, 0],
+            &[1, 2, 2, 3, 3, 1, 0],
+        ];
+        let colors = &t.input_colors;
+
+        let buf = frame.buffer_mut();
+        for row in 0..sample_rows as usize {
+            let y = inner.y + row as u16;
+            if y >= buf.area().bottom() {
+                break;
+            }
+            let pat_row = &pattern[row % pattern.len()];
+            for col in 0..sample_cols as usize {
+                let cx = inner.x + left_pad + col as u16 * cell_w;
+                if cx >= buf.area().right() {
+                    break;
+                }
+                let level = pat_row[col % pat_row.len()] as usize;
+                if level == 0 {
+                    fill_cell(buf, cx, y, fill_w, "\u{00b7}", t.dot_empty);
+                } else {
+                    fill_cell(buf, cx, y, fill_w, "\u{2580}", colors[level.min(4)]);
+                }
+            }
+        }
+    }
+
+    fn render_display_status_bar(&self, frame: &mut Frame, area: Rect) {
+        let hints = vec![
+            Span::styled(" ←→ ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("Switch mode   "),
+            Span::styled(" Tab ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("Switch tab   "),
+            Span::styled(" . ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("Back"),
+        ];
+        render_hint_bar(frame, area, hints);
+    }
+
     fn render_status_bar(
         &self,
         frame: &mut Frame,
@@ -839,13 +1079,19 @@ impl SettingsState {
             h
         };
 
-        let bar = Paragraph::new(Line::from(hints)).block(
+        render_hint_bar(frame, area, hints);
+    }
+}
+
+fn render_hint_bar(frame: &mut Frame, area: Rect, hints: Vec<Span<'_>>) {
+    let bar = Paragraph::new(Line::from(hints))
+        .alignment(Alignment::Center)
+        .block(
             Block::default()
                 .borders(Borders::TOP)
-                .border_style(Style::default().fg(theme().text_dim)),
+                .border_style(Style::default().fg(theme().divider)),
         );
-        frame.render_widget(bar, area);
-    }
+    frame.render_widget(bar, area);
 }
 
 fn truncate_str(s: &str, max: usize) -> String {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-04-06
+
+### Changed
+- Replace `Vec<Event>` with compact `EventIndex` for reduced memory usage
+- Add `x86_64-apple-darwin` build target
+
 ## [1.2.0] - 2026-04-05
 
 ### Added
