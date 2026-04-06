@@ -87,10 +87,7 @@ pub struct EventIndex {
 impl EventIndex {
     /// Build from raw events + session map. After this call the raw events
     /// can be dropped.
-    pub fn build(
-        events: &[Event],
-        session_info: &HashMap<String, (String, String)>,
-    ) -> Self {
+    pub fn build(events: &[Event], session_info: &HashMap<String, (String, String)>) -> Self {
         let mut root_intern: HashMap<String, u16> = HashMap::new();
         let mut cwd_intern: HashMap<String, u16> = HashMap::new();
         let mut roots: Vec<String> = Vec::new();
@@ -138,22 +135,23 @@ impl EventIndex {
 
         let entries: Vec<CompactEntry> = agg
             .into_iter()
-            .map(|((root_idx, cwd_idx, model, date, minute), (inp, out, cost, la, ls))| {
-                CompactEntry {
-                    root_idx,
-                    cwd_idx,
-                    model,
-                    date,
-                    minute,
-                    input_tokens: inp,
-                    output_tokens: out,
-                    cost,
-                    lines_accepted: la,
-                    lines_suggested: ls,
-                }
-            })
+            .map(
+                |((root_idx, cwd_idx, model, date, minute), (inp, out, cost, la, ls))| {
+                    CompactEntry {
+                        root_idx,
+                        cwd_idx,
+                        model,
+                        date,
+                        minute,
+                        input_tokens: inp,
+                        output_tokens: out,
+                        cost,
+                        lines_accepted: la,
+                        lines_suggested: ls,
+                    }
+                },
+            )
             .collect();
-
 
         EventIndex {
             cwds,
@@ -246,11 +244,7 @@ impl EventIndex {
             }
 
             if e.cost > 0.0 {
-                *daily_agg
-                    .entry(key)
-                    .or_default()
-                    .entry(e.date)
-                    .or_default() += e.cost;
+                *daily_agg.entry(key).or_default().entry(e.date).or_default() += e.cost;
             }
 
             if include_minute && e.cost > 0.0 {
@@ -264,13 +258,13 @@ impl EventIndex {
 
         // Convert (rk_idx, ModelId) → (String, String).
         let resolve = |k: &(u16, ModelId)| -> (String, String) {
-            (rk_strings[k.0 as usize].to_string(), k.1.as_str().to_string())
+            (
+                rk_strings[k.0 as usize].to_string(),
+                k.1.as_str().to_string(),
+            )
         };
 
-        let tokens = tok_agg
-            .into_iter()
-            .map(|(k, v)| (resolve(&k), v))
-            .collect();
+        let tokens = tok_agg.into_iter().map(|(k, v)| (resolve(&k), v)).collect();
 
         let daily_costs = daily_agg
             .into_iter()

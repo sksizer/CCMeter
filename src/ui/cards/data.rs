@@ -241,7 +241,6 @@ pub fn build_cwd_to_root(groups: &[ProjectGroup]) -> HashMap<String, String> {
     map
 }
 
-
 fn compute_model_shares(
     root_key: &str,
     model_tokens: &HashMap<(String, String), u64>,
