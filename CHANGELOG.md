@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0] - 2026-04-06
+
+### Added
+- Persist user preferences (settings saved across sessions)
+- Expanded heatmap setting with tabbed settings UI
+
+### Changed
+- Extract Settings into standalone persistent module
+
 ## [1.2.1] - 2026-04-06
 
 ### Changed
