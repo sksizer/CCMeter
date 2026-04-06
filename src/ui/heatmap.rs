@@ -186,8 +186,9 @@ pub fn render(
 
     let mut idx = 0usize;
     for row_area in row_areas.iter() {
+        let uniform_w = row_area.width / grid_cols;
         let col_constraints: Vec<Constraint> = (0..grid_cols)
-            .map(|_| Constraint::Ratio(1, grid_cols as u32))
+            .map(|_| Constraint::Length(uniform_w))
             .collect();
         let col_areas = Layout::default()
             .direction(Direction::Horizontal)
@@ -674,8 +675,9 @@ pub fn render_intraday(
 
     let mut idx = 0usize;
     for row_area in row_areas.iter() {
+        let uniform_w = row_area.width / grid_cols;
         let col_constraints: Vec<Constraint> = (0..grid_cols)
-            .map(|_| Constraint::Ratio(1, grid_cols as u32))
+            .map(|_| Constraint::Length(uniform_w))
             .collect();
         let col_areas = Layout::default()
             .direction(Direction::Horizontal)
@@ -982,8 +984,9 @@ pub fn render_weekly(
 
     let mut idx = 0usize;
     for row_area in row_areas.iter() {
+        let uniform_w = row_area.width / grid_cols;
         let col_constraints: Vec<Constraint> = (0..grid_cols)
-            .map(|_| Constraint::Ratio(1, grid_cols as u32))
+            .map(|_| Constraint::Length(uniform_w))
             .collect();
         let col_areas = Layout::default()
             .direction(Direction::Horizontal)

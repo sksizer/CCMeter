@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.1] - 2026-04-06
+
+### Fixed
+- Uniformly reduce heatmap cell sizes when the panel is too narrow
+
 ## [1.3.0] - 2026-04-06
 
 ### Added
