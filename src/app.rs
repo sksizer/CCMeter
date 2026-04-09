@@ -82,6 +82,9 @@ pub(crate) struct RenderCache {
     pub(crate) minute_model: HashMap<(String, String), HashMap<(NaiveDate, u16), f64>>,
     pub(crate) cards: Vec<cards::ProjectCard>,
     pub(crate) range: (NaiveDate, NaiveDate),
+    /// Maps display position → index in `config.groups`.
+    /// Navigation with ←/→ follows this order so it matches the card rendering order.
+    pub(crate) display_order: Vec<usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +197,8 @@ impl App {
     // ------------------------------------------------------------------
 
     fn project_cwds(&self) -> Option<Vec<String>> {
-        project_cwds_static(&self.config.groups, self.project_index)
+        let group_index = self.project_index.map(|i| self.render.display_order[i]);
+        project_cwds_static(&self.config.groups, group_index)
     }
 
     fn recompute_tokens(&mut self) {
@@ -218,6 +222,7 @@ impl App {
     fn recompute_render_cache(&mut self) {
         let cwds_filter = self.project_cwds();
         let source_root = self.config.source_roots[self.source_index].as_deref();
+        let prev_display_order = std::mem::take(&mut self.render.display_order);
         self.render = build_render_cache(
             &self.data.daily_tokens,
             &self.data.minute_tokens,
@@ -229,6 +234,12 @@ impl App {
             cwds_filter.as_deref(),
             self.time_filter,
         );
+        // When viewing a single project, build_render_cache produces a
+        // display_order with only one entry. Preserve the full ordering
+        // so that ←/→ navigation keeps working.
+        if self.project_index.is_some() {
+            self.render.display_order = prev_display_order;
+        }
         self.render_dirty = false;
     }
 
@@ -324,19 +335,19 @@ impl App {
                     self.card_scroll = self.card_scroll.saturating_sub(1);
                 }
                 KeyCode::Right | KeyCode::Char('l') => {
+                    let len = self.render.display_order.len();
                     self.project_index = match self.project_index {
-                        None if !self.config.groups.is_empty() => Some(0),
-                        Some(i) if i + 1 < self.config.groups.len() => Some(i + 1),
+                        None if len > 0 => Some(0),
+                        Some(i) if i + 1 < len => Some(i + 1),
                         _ => None,
                     };
                     self.card_scroll = 0;
                     self.recompute_tokens();
                 }
                 KeyCode::Left | KeyCode::Char('h') => {
+                    let len = self.render.display_order.len();
                     self.project_index = match self.project_index {
-                        None if !self.config.groups.is_empty() => {
-                            Some(self.config.groups.len() - 1)
-                        }
+                        None if len > 0 => Some(len - 1),
                         Some(0) => None,
                         Some(i) => Some(i - 1),
                         _ => None,
@@ -362,7 +373,7 @@ impl App {
                             &mut self.config.overrides,
                         );
                         if let Some(idx) = self.project_index
-                            && idx >= self.config.groups.len()
+                            && idx >= self.render.display_order.len()
                         {
                             self.project_index = None;
                         }
@@ -456,6 +467,18 @@ fn build_render_cache(
         project_cwds,
         &stats.daily_costs,
     );
+
+    // Build a mapping from display position (card order) → group index.
+    let root_to_group: std::collections::HashMap<String, usize> = groups
+        .iter()
+        .enumerate()
+        .map(|(i, g)| (g.root_key(), i))
+        .collect();
+    let display_order: Vec<usize> = cards
+        .iter()
+        .filter_map(|c| root_to_group.get(&c.root_key).copied())
+        .collect();
+
     let range = compute_range(&filtered, time_filter, today_snap);
 
     RenderCache {
@@ -464,6 +487,7 @@ fn build_render_cache(
         minute_model: stats.minute_costs,
         cards,
         range,
+        display_order,
     }
 }
 

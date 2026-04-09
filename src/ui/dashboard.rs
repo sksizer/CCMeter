@@ -118,8 +118,9 @@ impl App {
         let proj_display = match self.project_index {
             None => "All projects".to_string(),
             Some(i) => {
-                let name = &self.config.groups[i].name;
-                let total = self.config.groups.len();
+                let group_idx = self.render.display_order[i];
+                let name = &self.config.groups[group_idx].name;
+                let total = self.render.display_order.len();
                 format!("◀ {} ({}/{}) ▶", name, i + 1, total)
             }
         };
