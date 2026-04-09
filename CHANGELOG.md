@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0] - 2026-04-09
+
+### Added
+- ASCII art logo on the loading screen
+- Extract star animation into dedicated module
+
+### Fixed
+- KPI values and card costs now reflect the actual time window for 1H and 12H filters (sub-day minute-level filtering)
+
+### Changed
+- Track `cache_read`, `cache_creation`, `lines_added`, and `lines_deleted` in the compact event index
+
 ## [1.3.2] - 2026-04-06
 
 ### Changed
