@@ -8,6 +8,10 @@
 
 ### Fixed
 - KPI values and card costs now reflect the actual time window for 1H and 12H filters (sub-day minute-level filtering)
+- Fix 1H and 12H filters ignoring data from the previous day when the time window crosses midnight — KPIs, cards, and model stats now correctly include yesterday's data
+- Fix panic on non-ASCII characters (accented letters, emoji, CJK) in project rename and search inputs — cursor now navigates by character boundaries instead of raw bytes
+- Fix `truncate_str` panic when truncation falls in the middle of a multi-byte UTF-8 character
+- Fix search bar and rename modal cursor position being offset when text contains multi-byte characters
 
 ### Changed
 - Track `cache_read`, `cache_creation`, `lines_added`, and `lines_deleted` in the compact event index
