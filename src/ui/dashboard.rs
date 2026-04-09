@@ -192,10 +192,7 @@ impl App {
                 )
             })
             .collect();
-        spans.push(Span::styled(
-            " available",
-            Style::default().fg(t.text_dim),
-        ));
+        spans.push(Span::styled(" available", Style::default().fg(t.text_dim)));
 
         let line = Line::from(spans);
         frame.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
