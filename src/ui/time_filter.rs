@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{Local, NaiveDate};
+use chrono::{Local, NaiveDate, Timelike};
 
 use crate::data::tokens;
 
@@ -53,6 +53,18 @@ impl TimeFilter {
             self,
             TimeFilter::Hour1 | TimeFilter::Hour12 | TimeFilter::Today
         )
+    }
+
+    /// Minute-of-day cutoff for sub-day filters. Returns `None` for Today and
+    /// non-intraday filters (they use full-day data).
+    pub(crate) fn minute_cutoff(&self) -> Option<u16> {
+        let now = chrono::Local::now();
+        let current_minute = now.hour() as u16 * 60 + now.minute() as u16;
+        match self {
+            TimeFilter::Hour1 => Some(current_minute.saturating_sub(60)),
+            TimeFilter::Hour12 => Some(current_minute.saturating_sub(720)),
+            _ => None,
+        }
     }
 
     pub(crate) const ALL: &'static [TimeFilter] = &[

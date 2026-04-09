@@ -144,6 +144,7 @@ impl App {
 
         let render = build_render_cache(
             &daily_tokens,
+            &minute_tokens,
             &index,
             &groups,
             &merged_cache,
@@ -219,6 +220,7 @@ impl App {
         let source_root = self.config.source_roots[self.source_index].as_deref();
         self.render = build_render_cache(
             &self.data.daily_tokens,
+            &self.data.minute_tokens,
             &self.data.index,
             &self.config.groups,
             &self.data.merged_cache,
@@ -403,6 +405,7 @@ fn project_cwds_static(
 #[allow(clippy::too_many_arguments)]
 fn build_render_cache(
     daily_tokens: &DailyTokens,
+    minute_tokens: &MinuteTokens,
     index: &EventIndex,
     groups: &[discovery::ProjectGroup],
     merged_cache: &cache::Cache,
@@ -411,8 +414,17 @@ fn build_render_cache(
     project_cwds: Option<&[String]>,
     time_filter: TimeFilter,
 ) -> RenderCache {
-    let filtered = filter_daily(daily_tokens, time_filter);
     let today_snap = Local::now().date_naive();
+    let min_minute = time_filter.minute_cutoff();
+
+    // For sub-day filters (1H, 12H), build DailyTokens from minute-level data
+    // so that KPI values reflect the actual time window.
+    let filtered = if let Some(mm) = min_minute {
+        minute_tokens.to_daily_filtered(today_snap, mm)
+    } else {
+        filter_daily(daily_tokens, time_filter)
+    };
+
     let kpi = CachedKpi::compute(&filtered);
     let cwd_to_root = cards::build_cwd_to_root(groups);
     let date_filter = |d: NaiveDate| date_in_filter(d, time_filter, today_snap);
@@ -422,10 +434,21 @@ fn build_render_cache(
         &date_filter,
         project_cwds,
         time_filter.is_intraday(),
+        min_minute,
     );
+
+    // For sub-day filters, build a cache from the index filtered by minute
+    // so that card costs reflect the actual time window.
+    let effective_cache;
+    let cache_ref = if let Some(mm) = min_minute {
+        effective_cache = index.build_subday_cache(today_snap, mm);
+        &effective_cache
+    } else {
+        merged_cache
+    };
     let cards = cards::build_cards(
         groups,
-        merged_cache,
+        cache_ref,
         overrides,
         source_root,
         date_filter,
