@@ -258,7 +258,9 @@ impl App {
         if let View::Settings(state) = &mut self.view {
             state.tick = (self.start_time.elapsed().as_millis() / 80) as usize;
         }
-        if self.update_info.is_none() && let Ok(info) = self.update_rx.try_recv() {
+        if self.update_info.is_none()
+            && let Ok(info) = self.update_rx.try_recv()
+        {
             self.update_info = Some(info);
         }
         if self.render_dirty {
