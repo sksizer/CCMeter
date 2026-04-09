@@ -15,6 +15,7 @@
 - Fix ←/→ project navigation order not matching the displayed card order — navigation now follows the visual sort (starred first, then by cost) instead of alphabetical
 
 ### Changed
+- KPI "Avg/day" label switches to "Total tokens" in sub-day views (1H, 12H, Today) for clarity
 - Track `cache_read`, `cache_creation`, `lines_added`, and `lines_deleted` in the compact event index
 
 ## [1.3.2] - 2026-04-06

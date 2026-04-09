@@ -316,7 +316,15 @@ impl App {
             (&cost_str, " Cost USD ", t.cost),
             (&streak_str, " Streak ", t.tokens_in),
             (&active_str, " Active days ", t.tokens_out),
-            (&avg_str, " Avg/day ", t.cache),
+            (
+                &avg_str,
+                if self.time_filter.is_intraday() {
+                    " Total tokens "
+                } else {
+                    " Avg/day "
+                },
+                t.cache,
+            ),
             (&eff_str, " Efficiency ", t.lines_positive),
         ];
 
